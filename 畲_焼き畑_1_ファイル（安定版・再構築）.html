@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>畲 — 焼き畑｜1ファイル（一覧＋タイトル/本文 別設定・完全版）</title>
+<meta name="description" content="時間とともに言葉が変わる読み物。一覧/検索/読む/書く、エクスポート/インポート、上書き/新規保存、タイトルと本文で別の変化設定に対応。">
+<style>
+  :root{ --bg:#fff; --fg:#111; --muted:#6b7280; --line:#e5e7eb; }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:16px/1.7 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif}
+  header{padding:20px 16px;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.04em;cursor:pointer}
+  header .sub{color:var(--muted);font-size:12px;margin-top:4px}
+  main{max-width:980px;margin:0 auto;padding:16px}
+  nav.tab{display:flex;gap:8px;margin:8px 0 16px}
+  nav.tab button{appearance:none;border:1px solid var(--line);background:#fff;padding:8px 12px;border-radius:999px;cursor:pointer}
+  nav.tab button[aria-selected="true"]{border-color:#111;font-weight:700}
+  .grid{display:grid;grid-template-columns:350px 1fr;gap:16px}
+  @media (max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#fff}
+  .muted{color:var(--muted);font-size:12px}
+  input[type="text"], input[type="number"], select, textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+  textarea{min-height:220px;resize:vertical;white-space:pre-wrap}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .btn{appearance:none;border:1px solid var(--line);background:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+  .btn.primary{border-color:#111}
+  .btn.active{border-color:#111;font-weight:bold;background:#f0f0f0}
+  .post h2{margin:.2em 0 .3em;font-size:22px}
+  .post .body{font-size:18px}
+  .variant{position:relative;transition:opacity .6s ease}
+  .fade-out{opacity:0}
+  details.help{margin-top:8px}
+  kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 .3em;background:#f8fafc}
+  footer{padding:24px 16px;color:var(--muted);font-size:12px;text-align:center}
+  .badge{background:#f3f4f6;border:1px solid var(--line);padding:2px 8px;border-radius:999px;font-size:12px}
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="logo">畲 <span class="muted">/ 焼き畑</span></h1>
+    <div class="sub">一覧/検索/読む/書く、エクスポート/インポート。タイトルと本文で別の変化設定。</div>
+  </header>
+
+  <main>
+    <nav class="tab" role="tablist" aria-label="モード">
+      <button id="tab-read" role="tab" aria-selected="true">読む</button>
+      <button id="tab-write" role="tab" aria-selected="false">書く</button>
+    </nav>
+
+    <!-- 読む -->
+    <section id="pane-read" role="tabpanel" aria-labelledby="tab-read">
+      <div class="grid">
+        <div>
+          <div class="card" style="display:flex;gap:8px;align-items:center">
+            <input id="q" type="text" placeholder="検索（タイトル/本文）" style="flex:1">
+            <span class="badge" id="count-badge">0件</span>
+          </div>
+          <div id="post-list"></div>
+        </div>
+        <div>
+          <article class="card post" id="reader-empty">
+            <h2>ようこそ</h2>
+            <div class="body muted">左の一覧から作品を選ぶか、上の「書く」で新規投稿を作成してください。</div>
+          </article>
+          <article class="card post" id="reader" hidden>
+            <h2 id="r-title"></h2>
+            <div class="muted" id="r-meta"></div>
+            <div class="body" id="r-body"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 書く -->
+    <section id="pane-write" role="tabpanel" aria-labelledby="tab-write" hidden>
+      <div class="card">
+        <label class="muted">タイトル（可変OK：<kbd>[[A|B|C]]</kbd>）</label>
+        <input id="title" type="text" placeholder="例：夜の[[物語|手紙|夢]]">
+
+        <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px">
+          <div>
+            <label class="muted">タイトル速さ（秒）</label>
+            <input id="title-speed" type="number" min="2" step="1" placeholder="30" />
+          </div>
+          <div>
+            <label class="muted">タイトルタイミング</label>
+            <select id="title-timing">
+              <option value="random" selected>ランダム</option>
+              <option value="sync">同時</option>
+            </select>
+          </div>
+          <div>
+            <label class="muted">タイトルフェード（ms）</label>
+            <input id="title-fade" type="number" min="0" step="50" placeholder="200" />
+          </div>
+        </div>
+
+        <label class="muted" style="margin-top:8px;display:block;">本文（可変OK：<kbd>[[A|B|C]]</kbd>）</label>
+        <textarea id="body" placeholder="例：灯りは[[淡く|うすく|儚く]]燃えていた。\n風は[[静かに|そっと|ひっそり]]通りすぎた。"></textarea>
+
+        <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px">
+          <div>
+            <label class="muted">本文速さ（秒）</label>
+            <input id="body-speed" type="number" min="2" step="1" placeholder="60" />
+          </div>
+          <div>
+            <label class="muted">本文タイミング</label>
+            <select id="body-timing">
+              <option value="random" selected>ランダム</option>
+              <option value="sync">同時</option>
+            </select>
+          </div>
+          <div>
+            <label class="muted">本文フェード（ms）</label>
+            <input id="body-fade" type="number" min="0" step="50" placeholder="300" />
+          </div>
+        </div>
+
+        <label class="muted" style="margin-top:8px;display:block;">タグ（カンマ区切り）</label>
+        <input id="tags" type="text" placeholder="例: 畲, 焼き畑">
+
+        <div class="controls">
+          <!-- 並び順：上書き保存 → 保存（新規） -->
+          <button class="btn" id="overwrite">上書き保存</button>
+          <button class="btn primary" id="save">保存</button>
+          <button class="btn" id="preview">プレビュー</button>
+          <button class="btn" id="clear">フォーム初期化</button>
+          <span class="muted" id="save-msg" aria-live="polite"></span>
+        </div>
+
+        <details class="help">
+          <summary>使い方ヘルプ</summary>
+          <ul>
+            <li>タイトル/本文ともに <kbd>[[語A|語B|語C]]</kbd> で可変テキスト。</li>
+            <li>タイトルと本文で「速さ/タイミング/フェード」を<strong>別々に</strong>設定できます（空欄は既定）。</li>
+            <li>保存データはこのブラウザの <code>localStorage</code> に保存されます。</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <div class="card">
+      <div class="controls">
+        <button class="btn" id="export">エクスポート（.json）</button>
+        <label class="btn" for="import-file" style="cursor:pointer">インポート</label>
+        <input id="import-file" type="file" accept="application/json" hidden>
+        <span class="muted">保存先: localStorage / キー <code>she_posts_v3</code></span>
+      </div>
+    </div>
+  </main>
+
+  <footer>© <span id="year"></span> 畲 / 焼き畑 — 1ファイル</footer>
+
+<script>
+/**********************
+ * Minimal DOM helpers *
+ **********************/
+const $  = (s, root=document) => root.querySelector(s);     // not jQuery
+const $$ = (s, root=document) => Array.from(root.querySelectorAll(s));
+const on = (sel, type, handler) => { const el = $(sel); if(!el){ console.warn('[DEBUG] Missing element for', sel); return null; } el.addEventListener(type, handler); return el; };
+
+window.addEventListener('DOMContentLoaded', () => {
+  /**********************
+   * State & Defaults   *
+   **********************/
+  const KEY = 'she_posts_v3';
+  let posts = load();
+  let activeId = null; // 編集中のID（null=新規モード）
+  const DEFAULTS = {
+    title: { speed: 30, timing: 'random', fade: 200 },
+    body:  { speed: 60, timing: 'random', fade: 300 },
+  };
+
+  /**********************
+   * Storage & Loading  *
+   **********************/
+  function toV3Settings(s){
+    if(!s) return structuredClone(DEFAULTS);
+    if(s.title || s.body){
+      return {
+        title: { speed: Number(s.title?.speed)||DEFAULTS.title.speed, timing: (s.title?.timing==='sync'?'sync':'random'), fade: Number(s.title?.fade)||DEFAULTS.title.fade },
+        body:  { speed: Number(s.body?.speed)||DEFAULTS.body.speed,   timing: (s.body?.timing==='sync'?'sync':'random'),   fade: Number(s.body?.fade)||DEFAULTS.body.fade }
+      };
+    }
+    return {
+      title: { speed: Number(s.speed)||DEFAULTS.title.speed, timing: (s.timing==='sync'?'sync':'random'), fade: Number(s.fade)||DEFAULTS.title.fade },
+      body:  { speed: Number(s.speed)||DEFAULTS.body.speed,  timing: (s.timing==='sync'?'sync':'random'), fade: Number(s.fade)||DEFAULTS.body.fade },
+    };
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(KEY);
+      if(!raw){ const seeded = seed(); localStorage.setItem(KEY, JSON.stringify(seeded)); return seeded; }
+      const data = JSON.parse(raw);
+      return Array.isArray(data) ? data.map(migrateOne) : [];
+    }catch(e){ console.warn(e); return [];
+    }
+  }
+  function migrateOne(p){
+    return {
+      id: p.id || crypto.randomUUID(),
+      title: p.title || '無題',
+      body: p.body || '',
+      tags: Array.isArray(p.tags) ? p.tags : [],
+      created: p.created || Date.now(),
+      settings: toV3Settings(p.settings)
+    };
+  }
+  function seed(){
+    return [{
+      id: crypto.randomUUID(),
+      title: '夜の[[物語|手紙|夢]]',
+      body: '灯りは[[淡く|うすく|儚く]]燃えていた。\n風は[[静かに|そっと|ひっそり]]通りすぎた。',
+      tags: ['畲','焼き畑'],
+      created: Date.now(),
+      settings: structuredClone(DEFAULTS)
+    }];
+  }
+  function saveAll(){ localStorage.setItem(KEY, JSON.stringify(posts)); }
+
+  /**********************
+   * Tabs               *
+   **********************/
+  function showPane(which){
+    const isRead = which === 'read';
+    $('#pane-read').hidden  = !isRead;
+    $('#pane-write').hidden =  isRead;
+    $('#tab-read').setAttribute('aria-selected', isRead);
+    $('#tab-write').setAttribute('aria-selected', !isRead);
+    // モード連動ハイライト
+    syncActionButtons();
+  }
+  on('#tab-read','click', () => showPane('read'));
+  on('#tab-write','click', () => showPane('write'));
+  on('#logo','click',     () => showPane('read')); // ヘッダクリックでTOPへ
+
+  /**********************
+   * List & Reader      *
+   **********************/
+  function fmtDate(ts){ const d = new Date(ts); return d.toLocaleString(); }
+  function snippet(s, n){ s = (s||'').replace(/\s+/g,' '); return s.length>n ? s.slice(0,n)+'…' : s; }
+
+  function renderList(filter=''){
+    const host = $('#post-list'); if(!host) return; host.innerHTML = '';
+    const q = filter.trim().toLowerCase();
+    const arr = posts.slice().filter(p => !q || (p.title + ' ' + p.body).toLowerCase().includes(q))
+                       .sort((a,b)=> b.created - a.created);
+    $('#count-badge').textContent = `${arr.length}件`;
+    if(arr.length===0){ host.innerHTML = '<div class="card muted">まだ投稿がありません。</div>'; return; }
+    for(const p of arr){
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h3>${escapeHtml(snippet(p.title, 40))}</h3>
+        <div class="muted">${fmtDate(p.created)} · ${(p.tags||[]).join(', ')}</div>
+        <div class="muted" style="margin-top:6px">${escapeHtml(snippet(p.body,120))}</div>
+        <div class="controls" style="margin-top:8px">
+          <button class="btn" data-open="${p.id}">読む</button>
+          <button class="btn" data-edit="${p.id}">編集</button>
+          <button class="btn" data-del="${p.id}">削除</button>
+        </div>`;
+      host.appendChild(card);
+    }
+  }
+  on('#q','input', e => renderList(e.target.value));
+
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest && e.target.closest('button'); if(!btn) return;
+    if(btn.dataset.open) return openPost(btn.dataset.open);
+    if(btn.dataset.edit) return editPost(btn.dataset.edit);
+    if(btn.dataset.del)  return deletePost(btn.dataset.del);
+  });
+
+  function openPost(id){
+    const p = posts.find(x=>x.id===id); if(!p) return;
+    activeId = id;
+    $('#reader-empty').hidden = true;
+    $('#reader').hidden = false;
+    // タイトル/本文とも可変レンダリング＆個別設定で稼働
+    $('#r-title').innerHTML = renderContent(p.title);
+    startLivingText($('#r-title'), toV3Settings(p.settings).title);
+
+    $('#r-meta').textContent = `${fmtDate(p.created)} · ${(p.tags||[]).join(', ')}`;
+
+    $('#r-body').innerHTML = renderContent(p.body);
+    startLivingText($('#r-body'), toV3Settings(p.settings).body);
+    showPane('read');
+  }
+
+  /**********************
+   * Writer             *
+   **********************/
+  const saveBtn = $('#save');
+  const overwriteBtn = $('#overwrite');
+
+  function setActiveButton(btn){
+    saveBtn.classList.remove('active','primary');
+    overwriteBtn.classList.remove('active','primary');
+    if(btn){ btn.classList.add('active'); }
+  }
+  function syncActionButtons(){
+    // 書くタブ以外では意味が薄いが、状態は常に同期
+    if(activeId){ setActiveButton(overwriteBtn); }
+    else       { setActiveButton(saveBtn); }
+  }
+
+  function readEditor(){
+    const title = $('#title').value.trim() || '無題';
+    const body  = $('#body').value || '';
+    const tags  = $('#tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const settings = {
+      title: {
+        speed: parseFloat($('#title-speed').value) || DEFAULTS.title.speed,
+        timing: ($('#title-timing').value || DEFAULTS.title.timing),
+        fade: parseInt($('#title-fade').value) || DEFAULTS.title.fade,
+      },
+      body: {
+        speed: parseFloat($('#body-speed').value) || DEFAULTS.body.speed,
+        timing: ($('#body-timing').value || DEFAULTS.body.timing),
+        fade: parseInt($('#body-fade').value) || DEFAULTS.body.fade,
+      }
+    };
+    return { title, body, tags, created: Date.now(), settings };
+  }
+  function setEditor(p){
+    $('#title').value = p.title||'';
+    $('#body').value  = p.body||'';
+    $('#tags').value  = (p.tags||[]).join(', ');
+    const s = toV3Settings(p.settings);
+    $('#title-speed').value = s.title.speed || '';
+    $('#title-timing').value= s.title.timing || 'random';
+    $('#title-fade').value  = s.title.fade || '';
+    $('#body-speed').value  = s.body.speed || '';
+    $('#body-timing').value = s.body.timing || 'random';
+    $('#body-fade').value   = s.body.fade || '';
+  }
+
+  // 新規保存：毎回新しいIDで追加
+  on('#save','click', ()=>{
+    const payload = readEditor();
+    posts.push({ id: crypto.randomUUID(), ...payload });
+    saveAll();
+    renderList($('#q')?.value||'');
+    $('#save-msg').textContent = '新規として保存しました。';
+    setTimeout(()=>$('#save-msg').textContent='', 1500);
+    activeId = null; // 新規モード
+    syncActionButtons();
+  });
+
+  // 上書き保存：activeId がある場合のみ上書き
+  on('#overwrite','click', ()=>{
+    if(!activeId){ alert('編集中の投稿がありません。左の一覧で「編集」を押してください。'); return; }
+    const idx = posts.findIndex(p=>p.id===activeId);
+    if(idx===-1){ alert('対象の投稿が見つかりません。'); return; }
+    posts[idx] = { ...posts[idx], ...readEditor() };
+    saveAll();
+    renderList($('#q')?.value||'');
+    $('#save-msg').textContent = '上書き保存しました。';
+    setTimeout(()=>$('#save-msg').textContent='', 1500);
+    syncActionButtons();
+  });
+
+  // 一覧の「編集」からフォームへ
+  function editPost(id){ const p = posts.find(x=>x.id===id); if(!p) return; setEditor(p); activeId = p.id; showPane('write'); }
+
+  // 削除
+  function deletePost(id){
+    if(!confirm('この投稿を削除しますか？')) return;
+    posts = posts.filter(x=>x.id!==id); saveAll(); renderList($('#q')?.value||'');
+    if(activeId===id){ $('#reader').hidden=true; $('#reader-empty').hidden=false; activeId=null; }
+    syncActionButtons();
+  }
+
+  // プレビュー／クリア
+  on('#preview','click', ()=>{
+    const p = { id: 'preview', ...readEditor(), created: Date.now() };
+    $('#reader-empty').hidden = true; $('#reader').hidden = false;
+    $('#r-title').innerHTML = renderContent(p.title||'無題（プレビュー）');
+    startLivingText($('#r-title'), toV3Settings(p.settings).title);
+    $('#r-meta').textContent = `プレビュー · ${(p.tags||[]).join(', ')}`;
+    $('#r-body').innerHTML = renderContent(p.body||'');
+    startLivingText($('#r-body'), toV3Settings(p.settings).body);
+    showPane('read');
+  });
+  on('#clear','click', ()=>{ setEditor({}); activeId=null; syncActionButtons(); });
+
+  /**********************
+   * Living text engine *
+   **********************/
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }
+  function escapeAttr(s){ return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function renderContent(text){
+    const esc = escapeHtml(text||'');
+    const html = esc.replace(/\[\[([\s\S]*?)\]\]/g, (_, inner)=>{
+      const opts = inner.split('|').map(s=>s.trim()).filter(Boolean);
+      if(!opts.length) return '';
+      return `<span class="variant" data-options="${opts.map(escapeAttr).join('|')}">${opts[0]}</span>`;
+    }).replace(/\n/g,'<br>');
+    return html;
+  }
+
+  function startLivingText(scope, settings){
+    const token = crypto.randomUUID(); // stop previous loop by token
+    scope.dataset.token = token;
+
+    function flipOne(el, fade){
+      const opts = el.dataset.options.split('|');
+      const cur = el.textContent;
+      const next = opts[(opts.indexOf(cur)+1) % opts.length] || opts[0];
+      el.classList.add('fade-out');
+      setTimeout(()=>{ el.textContent = next; el.classList.remove('fade-out'); }, fade);
+    }
+
+    function tick(){
+      if(scope.dataset.token !== token) return;
+      const variants = Array.from(scope.querySelectorAll('.variant'));
+      if(variants.length){
+        if((settings.timing||'random') === 'sync'){
+          for(const el of variants) flipOne(el, settings.fade||300);
+        }else{
+          const i = Math.floor(Math.random()*variants.length);
+          flipOne(variants[i], settings.fade||300);
+        }
+      }
+      const base = (settings.speed||60)*1000;
+      const jitter = (Math.random()*0.5 + 0.75); // 0.75x–1.25x
+      setTimeout(tick, base*jitter);
+    }
+    setTimeout(tick, 1200);
+  }
+
+  /**********************
+   * Export / Import    *
+   **********************/
+  on('#export','click', ()=>{
+    const blob = new Blob([JSON.stringify(posts, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'she_posts_export_v3.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },0);
+  });
+
+  on('#import-file','change', async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const text = await file.text();
+    try{
+      const data = JSON.parse(text);
+      if(!Array.isArray(data)) throw new Error('配列ではありません');
+
+      const imported = data.map(migrateOne);
+
+      // マージ（既存を残しつつ、同一IDは上書き）
+      let added = 0, updated = 0;
+      const byId = new Map(posts.map(p=>[p.id, p]));
+      for(const item of imported){
+        if(byId.has(item.id)){
+          byId.set(item.id, { ...byId.get(item.id), ...item });
+          updated++;
+        }else{
+          byId.set(item.id, item);
+          added++;
+        }
+      }
+      posts = Array.from(byId.values());
+
+      saveAll();
+      renderList($('#q')?.value||'');
+      alert(`インポート（マージ）しました。追加: ${added} / 更新: ${updated}`);
+    }catch(err){
+      alert('インポートに失敗しました: '+err.message);
+    }finally{ e.target.value=''; }
+  });
+
+  /**********************
+   * Init & Smoke tests *
+   **********************/
+  document.getElementById('year').textContent = new Date().getFullYear();
+  renderList();
+  if(posts[0]) openPost(posts[0].id);
+  syncActionButtons();
+  runSmokeTests();
+
+  function runSmokeTests(){
+    try{
+      console.group('[畲/焼き畑] v3 Smoke Tests');
+      console.assert($('#save') && $('#overwrite'), 'action buttons exist');
+      console.assert($('#tab-read') && $('#tab-write'), 'tabs exist');
+      console.assert($('#pane-read') && $('#pane-write'), 'panes exist');
+      const t = renderContent('A [[B|C]] D');
+      console.assert(/class=\"variant\"/.test(t), 'renderContent wraps variants');
+      const v3a = toV3Settings({speed:10,timing:'sync',fade:100});
+      console.assert(v3a.title.speed===10 && v3a.body.timing==='sync', 'v1/v2 → v3 migration ok');
+      const v3b = toV3Settings({title:{speed:7,timing:'random',fade:90}, body:{speed:12,timing:'sync',fade:200}});
+      console.assert(v3b.title.speed===7 && v3b.body.speed===12, 'v3 passthrough ok');
+      // タブ切替の基本動作
+      showPane('write');
+      console.assert($('#pane-write').hidden===false && $('#pane-read').hidden===true, 'switch to write');
+      showPane('read');
+      console.assert($('#pane-read').hidden===false && $('#pane-write').hidden===true, 'switch to read');
+      console.log('All tests passed ✅');
+    }catch(e){ console.error('Smoke test failed ❌', e); }
+    finally{ console.groupEnd(); }
+  }
+});
+</script>
+</body>
+</html>
