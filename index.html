@@ -506,5 +506,39 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  const supabase = createClient("https://mthsczhdfzxyolfhwobi.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10aHNjemhkZnp4eW9sZmh3b2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5NzkwOTQsImV4cCI6MjA3NDU1NTA5NH0.hmDn16xpnRYu23QZVwgFfmIwu1WUVE7h1dAdMZI5D7o");
+
+  async function listPosts(q = "") {
+    let query = supabase.from("posts").select("*").order("created", { ascending: false }).limit(100);
+    if (q?.trim()) {
+      // タイトル/本文の簡易検索（ILIKE）
+      query = query.or(`title.ilike.%${q}%,body.ilike.%${q}%`);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data; // [{id,title,body,tags,created,settings}, ...]
+  }
+
+  async function saveNewPost(payload) {
+    // payload: {title, body, tags, created, settings}
+    const { data, error } = await supabase.from("posts").insert(payload).select().single();
+    if (error) throw error;
+    return data; // 生成された id を含む
+  }
+
+  async function overwritePost(id, payload) {
+    // payload: {title?, body?, tags?, created?, settings?}
+    const { data, error } = await supabase.from("posts").update(payload).eq("id", id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  // 例）既存のボタンハンドラの中で併用（localStorage保存の後に Supabase へも保存）
+  // const payload = { title, body, tags, created: new Date().toISOString(), settings: { speed, timing, fade } };
+  // await saveNewPost(payload); // or await overwritePost(id, payload);
+</script>
 </body>
 </html>
