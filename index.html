@@ -508,8 +508,32 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+  const supabase = createClient("https://mthsczhdfzxyolfhwobi.supabase.co", "sb_publishable_4yHsWfBaxbBbP6-qPjSppw_IQfgscbZ");
 
-  const supabase = createClient("https://mthsczhdfzxyolfhwobi.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10aHNjemhkZnp4eW9sZmh3b2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5NzkwOTQsImV4cCI6MjA3NDU1NTA5NH0.hmDn16xpnRYu23QZVwgFfmIwu1WUVE7h1dAdMZI5D7o");
+    // ★ 開発用：起動時にログイン（ログインUIを作る余裕なければ直書きでOK）
+  const { data: signIn, error: signErr } = await supabase.auth.signInWithPassword({
+    email: "judge-awash.3t@icloud.com",
+    password: "hewDup-1divri-povod",
+  });
+  if (signErr) { alert("Auth error: " + signErr.message); }
+
+  async function saveNewPost(payload) {
+    // 認証ユーザーIDを user_id に入れるのがポイント
+    const { data: session } = await supabase.auth.getUser();
+    const uid = session?.user?.id;
+    if (!uid) { alert("未ログインです"); return; }
+
+    const row = { ...payload, user_id: uid }; // ← これ！
+    const { data, error } = await supabase
+      .from("posts")
+      .insert([row])
+      .select()
+      .single();
+
+    if (error) { console.error(error); alert(error.message); return null; }
+    return data;
+  }
+
 
   async function listPosts(q = "") {
     let query = supabase.from("posts").select("*").order("created", { ascending: false }).limit(100);
@@ -527,7 +551,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const { data, error } = await supabase.from("posts").insert(payload).select().single();
     if (error) throw error;
     return data; // 生成された id を含む
+
+    console.log("[saveNewPost] payload=", payload);
+    if (error) {
+      console.error("[saveNewPost] error=", error);
+      alert("Insert error: " + (error.message || JSON.stringify(error)));
+      return null;
+    }
+    console.log("[saveNewPost] data=", data);
+    return data;
   }
+
 
   async function overwritePost(id, payload) {
     // payload: {title?, body?, tags?, created?, settings?}
